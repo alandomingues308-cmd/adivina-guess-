@@ -1,0 +1,26 @@
+{
+    "821925603434299454": {
+        "facil": 45,
+        "normal": 99,
+        "dificil": 33,
+        "max_racha": 7
+    },
+    "1079863751571947671": {
+        "facil": 61,
+        "normal": 176,
+        "dificil": 140,
+        "max_racha": 12
+    },
+    "1093298577255706754": {
+        "facil": 6,
+        "normal": 43,
+        "dificil": 1,
+        "max_racha": 2
+    },
+    "1082060376834854953": {
+        "facil": 1,
+        "normal": 5,
+        "dificil": 0,
+        "max_racha": 2
+    }
+}
