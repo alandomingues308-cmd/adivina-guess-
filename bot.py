@@ -320,13 +320,13 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
     color_embed = discord.Color.from_rgb(255, 102, 170) if modo_juego == "osu" else discord.Color.purple()
 
     embed = discord.Embed(
-        title=titulo_embed,
-        description=(
-            f"**Dificultad:** `{diff_str.capitalize()}` (+{puntos_mapa} pts)
-"
-            f"Escribe en el chat el nombre de la canción. Tienes **30 segundos**."
-        ),
-        color=color_embed
+    title=titulo_embed,
+    description=(
+        f"**Dificultad:** `{diff_str.capitalize()}` (+{puntos_mapa} pts)\n"
+        f"Escribe en el chat el nombre de la canción. Tienes **30 segundos**."
+    ),
+    color=color_embed
+)
     )
     embed.set_image(url="attachment://pista.jpg")
 
