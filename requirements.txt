@@ -1,5 +1,0 @@
-discord.py
-python-dotenv
-aiohttp
-rosu-pp-py
-Pillow
