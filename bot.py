@@ -442,9 +442,8 @@ async def puntos(interaction: discord.Interaction, juego: app_commands.Choice[st
         pts = data.get("puntos", data) if isinstance(data, dict) else data
         lineas.append(f"`#{i+1}` `{nombre}` — **{pts} pts**")
 
-    txt_ranking = "
-".join(lineas) or "Sin registros aún."
-
+    txt_ranking = "\n".join(lineas) or "Sin registros aún."
+    
     embed = discord.Embed(
         title=f"🏆 Tabla de Clasificación ({juego.name})",
         description=txt_ranking,
