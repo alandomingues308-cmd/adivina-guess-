@@ -369,7 +369,7 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
 
         await interaction.channel.send(embed=embed_victoria, file=archivo_completo, view=PlayAgainView(modo_juego))
 
-   except asyncio.TimeoutError:
+  except asyncio.TimeoutError:
         reiniciar_racha(modo_juego)
         desc_der = f"Nadie adivinó a tiempo.\n\n🎵 **La canción era:** {nombre_oficial}{link_str}"
         embed_derrota = discord.Embed(
