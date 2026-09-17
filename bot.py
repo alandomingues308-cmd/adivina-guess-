@@ -342,8 +342,7 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
     if modo_juego == "osu" and set_id:
         info_mapa = await obtener_info_beatmapset(set_id)
         nombre_oficial = f"{info_mapa.get('artist', '')} - {info_mapa.get('title', '')}" if info_mapa else mapa.get("nombre", mapa["respuestas"][0].title())
-        link_str = f"
-🔗 **[Link al Beatmapset]({mapa['url']})**"
+        link_str = f"🔗 **[Link al Beatmapset]({mapa['url']})**"
     else:
         nombre_oficial = mapa.get("nombre", mapa["respuestas"][0].title())
         link_str = ""
