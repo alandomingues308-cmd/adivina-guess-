@@ -327,7 +327,7 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
     ),
     color=color_embed
 )
-    )
+
     embed.set_image(url="attachment://pista.jpg")
 
     await interaction.followup.send(embed=embed, file=archivo_discord)
