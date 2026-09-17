@@ -21,7 +21,6 @@ def home():
     return "Bot status: Alive & Ready!"
 
 def run_flask():
-    # Render asigna automáticamente una variable de entorno PORT (por defecto 8080)
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
 
@@ -37,11 +36,8 @@ OSU_CLIENT_ID = os.getenv("OSU_CLIENT_ID")
 OSU_CLIENT_SECRET = os.getenv("OSU_CLIENT_SECRET")
 
 OSU_TOKEN = None
-
-# Sesión HTTP global reutilizable para no saturar RAM
 http_session: aiohttp.ClientSession = None
 
-# Manejo independiente de rachas
 racha_actual = {
     "osu": {"user_id": None, "streak": 0},
     "phigros": {"user_id": None, "streak": 0}
@@ -52,15 +48,12 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-
 # 4. Lectura y Guardado de Datos
 def cargar_canciones(juego: str):
     archivo = "phigros_songs.json" if juego == "phigros" else "beatmaps.json"
     try:
         with open(archivo, "r", encoding="utf-8") as f:
             datos = json.load(f)
-            
-            # Normalizar lista plana []
             if isinstance(datos, list):
                 clasificado = {"facil": [], "normal": [], "dificil": []}
                 for item in datos:
@@ -70,14 +63,11 @@ def cargar_canciones(juego: str):
                     else:
                         clasificado["normal"].append(item)
                 return clasificado
-            
-            # Normalizar diccionario {}
             if isinstance(datos, dict):
                 for key in ["facil", "normal", "dificil"]:
                     if key not in datos:
                         datos[key] = []
                 return datos
-
             return {"facil": [], "normal": [], "dificil": []}
     except Exception as e:
         print(f"❌ Error al cargar {archivo}: {e}")
@@ -101,15 +91,12 @@ def guardar_puntos(juego: str, puntos_db):
 def sumar_puntos(juego: str, user_id: int, user_name: str, puntos: int) -> int:
     puntos_db = cargar_puntos(juego)
     uid_str = str(user_id)
-    
     if uid_str not in puntos_db:
         puntos_db[uid_str] = {"nombre": user_name, "puntos": 0}
     elif isinstance(puntos_db[uid_str], int):
         puntos_db[uid_str] = {"nombre": user_name, "puntos": puntos_db[uid_str]}
-
     puntos_db[uid_str]["nombre"] = user_name
     puntos_db[uid_str]["puntos"] = puntos_db[uid_str].get("puntos", 0) + puntos
-    
     guardar_puntos(juego, puntos_db)
     return puntos_db[uid_str]["puntos"]
 
@@ -131,10 +118,8 @@ def guardar_stats(juego: str, stats_db):
 def registrar_victoria_stats(juego: str, user_id: int, dificultad_str: str, racha_conseguida: int):
     stats_db = cargar_stats(juego)
     uid_str = str(user_id)
-
     if uid_str not in stats_db:
         stats_db[uid_str] = {"facil": 0, "normal": 0, "dificil": 0, "max_racha": 0}
-
     dif = dificultad_str.lower().strip()
     if dif in ["facil", "easy"]:
         stats_db[uid_str]["facil"] += 1
@@ -142,10 +127,8 @@ def registrar_victoria_stats(juego: str, user_id: int, dificultad_str: str, rach
         stats_db[uid_str]["normal"] += 1
     elif dif in ["dificil", "hard", "insane", "expert"]:
         stats_db[uid_str]["dificil"] += 1
-
     if racha_conseguida > stats_db[uid_str].get("max_racha", 0):
         stats_db[uid_str]["max_racha"] = racha_conseguida
-
     guardar_stats(juego, stats_db)
 
 def registrar_racha(juego: str, user_id: int) -> int:
@@ -171,7 +154,6 @@ async def obtener_token_osu():
     global OSU_TOKEN, http_session
     if not OSU_CLIENT_ID or not OSU_CLIENT_SECRET or not http_session:
         return
-    
     url = "https://osu.ppy.sh/oauth/token"
     payload = {
         "client_id": OSU_CLIENT_ID,
@@ -180,7 +162,6 @@ async def obtener_token_osu():
         "scope": "public"
     }
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
-
     try:
         async with http_session.post(url, json=payload, headers=headers) as resp:
             if resp.status == 200:
@@ -195,14 +176,12 @@ async def obtener_info_beatmapset(set_id: str):
         await obtener_token_osu()
     if not OSU_TOKEN or not http_session:
         return None
-
     url = f"https://osu.ppy.sh/api/v2/beatmapsets/{set_id}"
     headers = {
         "Authorization": f"Bearer {OSU_TOKEN}",
         "Content-Type": "application/json",
         "Accept": "application/json"
     }
-
     try:
         async with http_session.get(url, headers=headers) as resp:
             if resp.status == 200:
@@ -211,29 +190,22 @@ async def obtener_info_beatmapset(set_id: str):
     except Exception:
         return None
 
-# Optimizado para liberar RAM de inmediato con el bloque 'with'
 def recortar_imagen(imagen_bytes):
     with Image.open(io.BytesIO(imagen_bytes)).convert("RGB") as img:
         ancho, alto = img.size
-
         ancho_crop = int(ancho * random.uniform(0.3, 0.4))
         alto_crop = int(alto * random.uniform(0.3, 0.4))
-
         x_max = max(1, ancho - ancho_crop)
         y_max = max(1, alto - alto_crop)
         left = random.randint(0, x_max)
         top = random.randint(0, y_max)
-
         with img.crop((left, top, left + ancho_crop, top + alto_crop)) as img_recortada:
             buffer = io.BytesIO()
-            # quality=85 y optimize=True reducen drásticamente el uso de memoria
             img_recortada.save(buffer, format="JPEG", quality=85, optimize=True)
-    
     buffer.seek(0)
     return buffer
 
-
-# 5. Componentes de Interfaz UI
+# 5. Componentes UI
 class DificultadSelect(discord.ui.Select):
     def __init__(self, juego: str):
         self.juego = juego
@@ -248,21 +220,17 @@ class DificultadSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         self.disabled = True
         await interaction.response.edit_message(view=self.view)
-        
         valor_elegido = self.values[0]
         dificultad_choice = None
-        
         if valor_elegido != "aleatorio":
             nombres = {"facil": "🟢 Fácil", "normal": "🟡 Normal", "dificil": "🔴 Difícil"}
             dificultad_choice = app_commands.Choice(name=nombres[valor_elegido], value=valor_elegido)
-            
         await ejecutar_juego(interaction, self.juego, dificultad_choice)
 
 class PlayAgainView(discord.ui.View):
     def __init__(self, juego: str):
         super().__init__(timeout=60)
         self.add_item(DificultadSelect(juego))
-
 
 # 6. Lógica de Juego Unificada
 async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, dificultad: app_commands.Choice[str] = None):
@@ -296,7 +264,6 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
         url_phigros = mapa.get("imagen_url") or mapa.get("url_imagen") or mapa.get("imagen")
         urls_imagen = [url_phigros] if url_phigros else []
 
-    # Reutiliza la sesión HTTP global
     for url in urls_imagen:
         if not url:
             continue
@@ -319,15 +286,12 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
     titulo_embed = "🎮 ¡Adivina el mapa de osu!" if modo_juego == "osu" else "🎵 ¡Adivina la canción de Phigros!"
     color_embed = discord.Color.from_rgb(255, 102, 170) if modo_juego == "osu" else discord.Color.purple()
 
+    desc_texto = f"**Dificultad:** `{diff_str.capitalize()}` (+{puntos_mapa} pts)\nEscribe en el chat el nombre de la canción. Tienes **30 segundos**."
     embed = discord.Embed(
-    title=titulo_embed,
-    description=(
-        f"**Dificultad:** `{diff_str.capitalize()}` (+{puntos_mapa} pts)\n"
-        f"Escribe en el chat el nombre de la canción. Tienes **30 segundos**."
-    ),
-    color=color_embed
-)
-
+        title=titulo_embed,
+        description=desc_texto,
+        color=color_embed
+    )
     embed.set_image(url="attachment://pista.jpg")
 
     await interaction.followup.send(embed=embed, file=archivo_discord)
@@ -342,7 +306,7 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
     if modo_juego == "osu" and set_id:
         info_mapa = await obtener_info_beatmapset(set_id)
         nombre_oficial = f"{info_mapa.get('artist', '')} - {info_mapa.get('title', '')}" if info_mapa else mapa.get("nombre", mapa["respuestas"][0].title())
-        link_str = f"🔗 **[Link al Beatmapset]({mapa['url']})**"
+        link_str = f"\n🔗 **[Link al Beatmapset]({mapa['url']})**"
     else:
         nombre_oficial = mapa.get("nombre", mapa["respuestas"][0].title())
         link_str = ""
@@ -350,7 +314,7 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
     buffer_completo = io.BytesIO(imagen_bytes)
     archivo_completo = discord.File(fp=buffer_completo, filename="completo.jpg")
 
-   try:
+    try:
         msg_ganador = await bot.wait_for("message", check=check, timeout=30.0)
         total_puntos = sumar_puntos(modo_juego, msg_ganador.author.id, msg_ganador.author.display_name, puntos_mapa)
         racha = registrar_racha(modo_juego, msg_ganador.author.id)
@@ -376,13 +340,13 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
         )
         embed_derrota.set_image(url="attachment://completo.jpg")
         await interaction.channel.send(embed=embed_derrota, file=archivo_completo, view=PlayAgainView(modo_juego))
+
 # 7. Eventos y Comandos Slash
 @bot.event
 async def on_ready():
     global http_session
     if http_session is None or http_session.closed:
         http_session = aiohttp.ClientSession(headers={"User-Agent": "Mozilla/5.0 DiscordBot/1.0"})
-    
     print(f"🤖 Bot iniciado como: {bot.user.name}")
     await obtener_token_osu()
     try:
@@ -413,7 +377,6 @@ async def on_close():
 async def adivina(interaction: discord.Interaction, juego: app_commands.Choice[str], dificultad: app_commands.Choice[str] = None):
     await ejecutar_juego(interaction, juego.value, dificultad)
 
-
 @bot.tree.command(name="puntos", description="Muestra la clasificación por juego")
 @app_commands.describe(juego="Selecciona el juego")
 @app_commands.choices(
@@ -424,15 +387,12 @@ async def adivina(interaction: discord.Interaction, juego: app_commands.Choice[s
 )
 async def puntos(interaction: discord.Interaction, juego: app_commands.Choice[str]):
     await interaction.response.defer()
-
     pts_data = cargar_puntos(juego.value)
-    
     top = sorted(
         pts_data.items(), 
         key=lambda x: x[1]["puntos"] if isinstance(x[1], dict) else x[1], 
         reverse=True
     )[:10]
-
     lineas = []
     for i, (uid, data) in enumerate(top):
         nombre = data.get("nombre", f"<@{uid}>") if isinstance(data, dict) else f"<@{uid}>"
@@ -440,15 +400,12 @@ async def puntos(interaction: discord.Interaction, juego: app_commands.Choice[st
         lineas.append(f"`#{i+1}` `{nombre}` — **{pts} pts**")
 
     txt_ranking = "\n".join(lineas) or "Sin registros aún."
-    
     embed = discord.Embed(
         title=f"🏆 Tabla de Clasificación ({juego.name})",
         description=txt_ranking,
         color=discord.Color.gold()
     )
-
     await interaction.followup.send(embed=embed)
-
 
 @bot.tree.command(name="stats", description="Muestra tus estadísticas según el juego")
 @app_commands.describe(juego="Selecciona el juego a consultar", usuario="Usuario a consultar (opcional)")
@@ -460,11 +417,9 @@ async def puntos(interaction: discord.Interaction, juego: app_commands.Choice[st
 )
 async def stats(interaction: discord.Interaction, juego: app_commands.Choice[str], usuario: discord.Member = None):
     await interaction.response.defer()
-
     target_user = usuario or interaction.user
     stats_db = cargar_stats(juego.value)
     uid_str = str(target_user.id)
-    
     user_data = stats_db.get(uid_str, {"facil": 0, "normal": 0, "dificil": 0, "max_racha": 0})
     total = user_data.get("facil", 0) + user_data.get("normal", 0) + user_data.get("dificil", 0)
 
@@ -480,7 +435,6 @@ async def stats(interaction: discord.Interaction, juego: app_commands.Choice[str
     embed.add_field(name="🎮 Total Adivinadas", value=f"`{total}`", inline=True)
 
     await interaction.followup.send(embed=embed)
-
 
 # 8. Iniciar Servidor Web Keep-Alive y Lanzar Bot
 if __name__ == "__main__":
