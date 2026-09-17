@@ -359,18 +359,10 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
 
         tag_racha = f" 🔥 **(Racha: {racha})**" if racha >= 2 else ""
 
+        desc_vic = f"👤 **Ganador:** {msg_ganador.author.mention}{tag_racha}\n💬 **Respuesta enviada:** `{msg_ganador.content}`\n⭐ **Puntos ganados:** `+{puntos_mapa}` (Total: **{total_puntos} pts**)\n\n🎵 **Canción:** {nombre_oficial}{link_str}"
         embed_victoria = discord.Embed(
             title="🎉 ¡Correcto!",
-            description=(
-                f"👤 **Ganador:** {msg_ganador.author.mention}{tag_racha}
-"
-                f"💬 **Respuesta enviada:** `{msg_ganador.content}`
-"
-                f"⭐ **Puntos ganados:** `+{puntos_mapa}` (Total: **{total_puntos} pts**)
-
-"
-                f"🎵 **Canción:** {nombre_oficial}{link_str}"
-            ),
+            description=desc_vic,
             color=discord.Color.green()
         )
         embed_victoria.set_image(url="attachment://completo.jpg")
