@@ -350,13 +350,11 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
     buffer_completo = io.BytesIO(imagen_bytes)
     archivo_completo = discord.File(fp=buffer_completo, filename="completo.jpg")
 
-    try:
+   try:
         msg_ganador = await bot.wait_for("message", check=check, timeout=30.0)
-
         total_puntos = sumar_puntos(modo_juego, msg_ganador.author.id, msg_ganador.author.display_name, puntos_mapa)
         racha = registrar_racha(modo_juego, msg_ganador.author.id)
         registrar_victoria_stats(modo_juego, msg_ganador.author.id, diff_str, racha)
-
         tag_racha = f" 🔥 **(Racha: {racha})**" if racha >= 2 else ""
 
         desc_vic = f"👤 **Ganador:** {msg_ganador.author.mention}{tag_racha}\n💬 **Respuesta enviada:** `{msg_ganador.content}`\n⭐ **Puntos ganados:** `+{puntos_mapa}` (Total: **{total_puntos} pts**)\n\n🎵 **Canción:** {nombre_oficial}{link_str}"
@@ -366,10 +364,9 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
             color=discord.Color.green()
         )
         embed_victoria.set_image(url="attachment://completo.jpg")
-
         await interaction.channel.send(embed=embed_victoria, file=archivo_completo, view=PlayAgainView(modo_juego))
 
-except asyncio.TimeoutError:
+    except asyncio.TimeoutError:
         reiniciar_racha(modo_juego)
         desc_der = f"Nadie adivinó a tiempo.\n\n🎵 **La canción era:** {nombre_oficial}{link_str}"
         embed_derrota = discord.Embed(
