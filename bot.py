@@ -369,20 +369,16 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
 
         await interaction.channel.send(embed=embed_victoria, file=archivo_completo, view=PlayAgainView(modo_juego))
 
-    except asyncio.TimeoutError:
+   except asyncio.TimeoutError:
         reiniciar_racha(modo_juego)
-
-       desc_der = f"Nadie adivinó a tiempo.\n\n🎵 **La canción era:** {nombre_oficial}{link_str}"
+        desc_der = f"Nadie adivinó a tiempo.\n\n🎵 **La canción era:** {nombre_oficial}{link_str}"
         embed_derrota = discord.Embed(
             title="⏰ ¡Tiempo agotado!",
             description=desc_der,
             color=discord.Color.red()
         )
         embed_derrota.set_image(url="attachment://completo.jpg")
-
         await interaction.channel.send(embed=embed_derrota, file=archivo_completo, view=PlayAgainView(modo_juego))
-
-
 # 7. Eventos y Comandos Slash
 @bot.event
 async def on_ready():
