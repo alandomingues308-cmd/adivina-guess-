@@ -567,7 +567,32 @@ async def stats(interaction: discord.Interaction, juego: app_commands.Choice[str
     embed.add_field(name="🎮 Total Adivinadas", value=f"`{total}`", inline=True)
 
     await interaction.followup.send(embed=embed)
+    
+from threading import Thread
+from flask import Flask
 
+# Servidor Flask mínimo para mantener vivo el puerto en Render
+app = Flask("")
+
+
+@app.route("/")
+def home():
+  return "Bot activo 24/7"
+
+
+def run():
+  port = int(os.environ.get("PORT", 8080))
+  app.run(host="0.0.0.0", port=port)
+
+
+def keep_alive():
+  t = Thread(target=run)
+  t.daemon = True
+  t.start()
+
+
+# Iniciar el servidor web antes de bot.run()
+keep_alive()
 
 # 7. Iniciar Bot
 bot.run(DISCORD_TOKEN)
