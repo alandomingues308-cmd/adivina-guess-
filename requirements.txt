@@ -3,3 +3,4 @@ aiohttp
 python-dotenv
 Pillow
 flask
+firebase-admin
