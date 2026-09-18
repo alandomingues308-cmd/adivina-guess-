@@ -307,24 +307,33 @@ async def obtener_info_beatmapset(set_id: str):
     except Exception:
         return None
 
-def recortar_imagen(imagen_bytes):
-    with Image.open(io.BytesIO(imagen_bytes)).convert("RGB") as img:
-        ancho, alto = img.size
+def recortar_imagen(imagen_bytes, juego: str = "osu"):
+  with Image.open(io.BytesIO(imagen_bytes)).convert("RGB") as img:
+    ancho, alto = img.size
 
-        ancho_crop = int(ancho * random.uniform(0.15, 0.18))
-        alto_crop = int(alto * random.uniform(0.25, 0.3))
+    if juego == "osu":
+      # Configuración de recorte para osu! (ejemplo: recortes más pequeños/enfocados)
+      ancho_crop = int(ancho * random.uniform(0.15, 0.18))
+      alto_crop = int(alto * random.uniform(0.25, 0.30))
+    else:
+      # Configuración de recorte para Phigros (ejemplo: recortes un poco más amplios)
+      ancho_crop = int(ancho * random.uniform(0.25, 0.35))
+      alto_crop = int(alto * random.uniform(0.35, 0.45))
 
-        x_max = max(1, ancho - ancho_crop)
-        y_max = max(1, alto - alto_crop)
-        left = random.randint(0, x_max)
-        top = random.randint(0, y_max)
+    x_max = max(1, ancho - ancho_crop)
+    y_max = max(1, alto - alto_crop)
+    left = random.randint(0, x_max)
+    top = random.randint(0, y_max)
 
-        with img.crop((left, top, left + ancho_crop, top + alto_crop)) as img_recortada:
-            buffer = io.BytesIO()
-            img_recortada.save(buffer, format="JPEG", quality=85, optimize=True)
+    with img.crop(
+        (left, top, left + ancho_crop, top + alto_crop)
+    ) as img_recortada:
+      buffer = io.BytesIO()
+      img_recortada.save(buffer, format="JPEG", quality=85, optimize=True)
+
+  buffer.seek(0)
+  return buffer
     
-    buffer.seek(0)
-    return buffer
 
 # ==========================================
 # 5. COMPONENTES UI Y JUEGO
@@ -404,7 +413,12 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
         await interaction.followup.send("❌ Error al descargar la imagen de la canción.")
         return
 
-    buffer_recorte = recortar_imagen(imagen_bytes)
+    # Cambias esta línea:
+# buffer_recorte = recortar_imagen(imagen_bytes)
+
+# Por esta:
+    buffer_recorte = recortar_imagen(imagen_bytes, juego=modo_juego)
+
     archivo_discord = discord.File(fp=buffer_recorte, filename="pista.jpg")
 
     puntos_mapa = {"facil": 1, "normal": 3, "dificil": 5}.get(diff_str, 3)
