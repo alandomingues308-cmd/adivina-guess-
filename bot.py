@@ -313,12 +313,12 @@ def recortar_imagen(imagen_bytes, juego: str = "osu"):
 
     if juego == "osu":
       # Configuración de recorte para osu! (ejemplo: recortes más pequeños/enfocados)
-      ancho_crop = int(ancho * random.uniform(0.15, 0.18))
-      alto_crop = int(alto * random.uniform(0.25, 0.30))
+      ancho_crop = int(ancho * random.uniform(0.25, 0.3))
+      alto_crop = int(alto * random.uniform(0.3, 0.4))
     else:
       # Configuración de recorte para Phigros (ejemplo: recortes un poco más amplios)
-      ancho_crop = int(ancho * random.uniform(0.25, 0.35))
-      alto_crop = int(alto * random.uniform(0.35, 0.45))
+      ancho_crop = int(ancho * random.uniform(0.18, 0.22))
+      alto_crop = int(alto * random.uniform(0.20, 0.24))
 
     x_max = max(1, ancho - ancho_crop)
     y_max = max(1, alto - alto_crop)
