@@ -265,13 +265,22 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
         url_phigros = mapa.get("imagen_url") or mapa.get("url_imagen") or mapa.get("imagen")
         urls_imagen = [url_phigros] if url_phigros else []
 
-    headers_request = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        headers_request = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        "Referer": "https://phigros.fandom.com/"
+    }
 
     for url in urls_imagen:
         if not url:
             continue
         try:
-            async with http_session.get(url, headers=headers_request,allow_redirects=True, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+            async with http_session.get(
+                url, 
+                headers=headers_request, 
+                allow_redirects=True, 
+                timeout=aiohttp.ClientTimeout(total=8)
+            ) as resp:
                 if resp.status == 200:
                     imagen_bytes = await resp.read()
                     break
