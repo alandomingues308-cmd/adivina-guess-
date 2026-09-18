@@ -58,11 +58,11 @@ if firebase_json and HAS_FIREBASE:
         cred = credentials.Certificate(cred_dict)
         firebase_admin.initialize_app(cred)
         db = firestore.client()
-        print("✅ Firebase Firestore conectado correctamente.")
+        print("✅ Firebase Firestore conectado correctamente.", flush=True)
     except Exception as e:
-        print(f"❌ Error al inicializar Firebase Firestore: {e}")
+        print(f"❌ Error al inicializar Firebase Firestore: {e}", flush=True)
 else:
-    print("⚠️ No se encontró la variable FIREBASE_CREDENTIALS o la librería firebase-admin. Usando sistema local JSON.")
+    print("⚠️ No se encontró la variable FIREBASE_CREDENTIALS o la librería firebase-admin. Usando sistema local JSON.", flush=True)
 
 OSU_TOKEN = None
 http_session: aiohttp.ClientSession = None
@@ -82,6 +82,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 def migrar_json_a_firestore():
     """Migra los datos locales existentes a Firestore al iniciar."""
     if not db:
+        print("⚠️ Saltando migración: No hay conexión con Firestore.", flush=True)
         return
 
     archivos_migracion = [
@@ -98,7 +99,7 @@ def migrar_json_a_firestore():
                     datos = json.load(f)
 
                 if isinstance(datos, dict) and datos:
-                    print(f"📦 Migrando {archivo} a la colección Firestore '{coleccion}'...")
+                    print(f"📦 Migrando {archivo} a la colección Firestore '{coleccion}'...", flush=True)
                     for uid_str, item in datos.items():
                         doc_ref = db.collection(coleccion).document(uid_str)
                         if es_puntos:
@@ -107,9 +108,9 @@ def migrar_json_a_firestore():
                             doc_ref.set({"nombre": nombre, "puntos": pts}, merge=True)
                         else:
                             doc_ref.set(item, merge=True)
-                    print(f"✅ Migración de {archivo} completada.")
+                    print(f"✅ Migración de {archivo} completada.", flush=True)
             except Exception as e:
-                print(f"❌ Error al migrar {archivo}: {e}")
+                print(f"❌ Error al migrar {archivo}: {e}", flush=True)
 
 # ==========================================
 # 4. LECTURA Y GUARDADO DE DATOS (Firestore + Respaldo JSON)
@@ -138,7 +139,7 @@ def cargar_canciones(juego: str):
 
             return {"facil": [], "normal": [], "dificil": []}
     except Exception as e:
-        print(f"❌ Error al cargar {archivo}: {e}")
+        print(f"❌ Error al cargar {archivo}: {e}", flush=True)
         return {"facil": [], "normal": [], "dificil": []}
 
 def sumar_puntos(juego: str, user_id: int, user_name: str, puntos: int) -> int:
@@ -159,9 +160,10 @@ def sumar_puntos(juego: str, user_id: int, user_name: str, puntos: int) -> int:
                 "nombre": user_name,
                 "puntos": nuevo_total
             }, merge=True)
+            print(f"✅ Puntos guardados en Firestore para {user_name}: {nuevo_total} pts", flush=True)
             return nuevo_total
         except Exception as e:
-            print(f"❌ Error al actualizar puntos en Firestore: {e}")
+            print(f"❌ Error al actualizar puntos en Firestore: {e}", flush=True)
 
     # Fallback JSON local
     archivo = "puntos_phigros.json" if juego == "phigros" else "puntos.json"
@@ -185,7 +187,7 @@ def sumar_puntos(juego: str, user_id: int, user_name: str, puntos: int) -> int:
         with open(archivo, "w", encoding="utf-8") as f:
             json.dump(puntos_db, f, indent=4)
     except Exception as e:
-        print(f"❌ Error al guardar localmente: {e}")
+        print(f"❌ Error al guardar localmente: {e}", flush=True)
         
     return puntos_db[uid_str]["puntos"]
 
@@ -217,7 +219,7 @@ def registrar_victoria_stats(juego: str, user_id: int, dificultad_str: str, rach
             doc_ref.set(stats_data, merge=True)
             return
         except Exception as e:
-            print(f"❌ Error al guardar stats en Firestore: {e}")
+            print(f"❌ Error al guardar stats en Firestore: {e}", flush=True)
 
     # Fallback JSON local
     archivo = "stats_phigros.json" if juego == "phigros" else "stats.json"
@@ -240,7 +242,7 @@ def registrar_victoria_stats(juego: str, user_id: int, dificultad_str: str, rach
         with open(archivo, "w", encoding="utf-8") as f:
             json.dump(stats_db, f, indent=4)
     except Exception as e:
-        print(f"❌ Error al guardar stats localmente: {e}")
+        print(f"❌ Error al guardar stats localmente: {e}", flush=True)
 
 def registrar_racha(juego: str, user_id: int) -> int:
     global racha_actual
@@ -281,7 +283,7 @@ async def obtener_token_osu():
                 data = await resp.json()
                 OSU_TOKEN = data.get("access_token")
     except Exception as e:
-        print(f"❌ Error al obtener token de osu!: {e}")
+        print(f"❌ Error al obtener token de osu!: {e}", flush=True)
 
 async def obtener_info_beatmapset(set_id: str):
     global OSU_TOKEN, http_session
@@ -486,7 +488,7 @@ async def on_ready():
     if http_session is None or http_session.closed:
         http_session = aiohttp.ClientSession(headers={"User-Agent": "Mozilla/5.0 DiscordBot/1.0"})
     
-    print(f"🤖 Bot iniciado como: {bot.user.name}")
+    print(f"🤖 Bot iniciado como: {bot.user.name}", flush=True)
     await obtener_token_osu()
 
     # Ejecutar migración de datos locales a Firestore
@@ -494,9 +496,9 @@ async def on_ready():
 
     try:
         synced = await bot.tree.sync()
-        print(f"✅ Sincronizados {len(synced)} comandos.")
+        print(f"✅ Sincronizados {len(synced)} comandos.", flush=True)
     except Exception as e:
-        print(f"❌ Error al sincronizar: {e}")
+        print(f"❌ Error al sincronizar: {e}", flush=True)
 
 @bot.event
 async def on_close():
@@ -529,7 +531,6 @@ async def adivina(interaction: discord.Interaction, juego: app_commands.Choice[s
     ]
 )
 async def puntos(interaction: discord.Interaction, juego: app_commands.Choice[str]):
-    # Defer inmediato para evitar Timeout (Error 10062)
     await interaction.response.defer()
 
     top_list = []
@@ -541,7 +542,7 @@ async def puntos(interaction: discord.Interaction, juego: app_commands.Choice[st
                 data = doc.to_dict()
                 top_list.append((doc.id, data))
         except Exception as e:
-            print(f"❌ Error al leer puntos desde Firestore: {e}")
+            print(f"❌ Error al leer puntos desde Firestore: {e}", flush=True)
 
     if not top_list and not db:
         archivo = "puntos_phigros.json" if juego.value == "phigros" else "puntos.json"
@@ -584,7 +585,6 @@ async def puntos(interaction: discord.Interaction, juego: app_commands.Choice[st
     ]
 )
 async def stats(interaction: discord.Interaction, juego: app_commands.Choice[str], usuario: discord.Member = None):
-    # Defer inmediato para evitar Timeout (Error 10062)
     await interaction.response.defer()
 
     target_user = usuario or interaction.user
@@ -597,7 +597,7 @@ async def stats(interaction: discord.Interaction, juego: app_commands.Choice[str
             if doc.exists:
                 user_data.update(doc.to_dict())
         except Exception as e:
-            print(f"❌ Error al consultar stats en Firestore: {e}")
+            print(f"❌ Error al consultar stats en Firestore: {e}", flush=True)
     else:
         archivo = "stats_phigros.json" if juego.value == "phigros" else "stats.json"
         if os.path.exists(archivo):
@@ -630,4 +630,4 @@ if __name__ == "__main__":
     if DISCORD_TOKEN:
         bot.run(DISCORD_TOKEN)
     else:
-        print("❌ ERROR: No se encontró la variable DISCORD_TOKEN.")
+        print("❌ ERROR: No se encontró la variable DISCORD_TOKEN.", flush=True)
