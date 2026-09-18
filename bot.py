@@ -265,17 +265,17 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
         urls_imagen = [url_phigros] if url_phigros else []
 
         for url in urls_imagen:
-        if not url:
-            continue
-        try:
-            async with http_session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
-                if resp.status == 200:
-                    imagen_bytes = await resp.read()
-                    break
-                else:
-                    print(f"⚠️ [Phigros Error] Estado HTTP {resp.status} al cargar '{mapa.get('nombre')}' -> URL: {url}")
-        except Exception as e:
-            print(f"❌ [Phigros Error] Excepción al descargar '{mapa.get('nombre')}': {e} -> URL: {url}")
+            if not url:
+                continue
+            try:
+                async with http_session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                    if resp.status == 200:
+                        imagen_bytes = await resp.read()
+                        break
+                    else:
+                        print(f"⚠️ [Phigros Error] Estado HTTP {resp.status} al cargar '{mapa.get('nombre')}' -> URL: {url}")
+            except Exception as e:
+                print(f"❌ [Phigros Error] Excepción al descargar '{mapa.get('nombre')}': {e} -> URL: {url}")
 
     if not imagen_bytes:
         nombre_cancion = mapa.get("nombre", mapa.get("respuestas", ["Desconocida"])[0])
