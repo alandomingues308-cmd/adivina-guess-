@@ -472,10 +472,12 @@ async def adivina(interaction: discord.Interaction, juego: app_commands.Choice[s
     ]
 )
 async def puntos(interaction: discord.Interaction, juego: app_commands.Choice[str]):
+    # 1. Avisar inmediatamente a Discord para evitar el timeout de 3 segundos
     await interaction.response.defer()
 
     top_list = []
 
+    # 2. Realizar la consulta a Firestore después de defer()
     if db:
         try:
             docs = db.collection(f"puntos_{juego.value}").order_by("puntos", direction=firestore.Query.DESCENDING).limit(10).stream()
@@ -486,7 +488,6 @@ async def puntos(interaction: discord.Interaction, juego: app_commands.Choice[st
             print(f"❌ Error al leer puntos desde Firestore: {e}")
 
     if not top_list and not db:
-        # Consulta fallback local JSON
         archivo = "puntos_phigros.json" if juego.value == "phigros" else "puntos.json"
         pts_data = {}
         if os.path.exists(archivo):
@@ -516,8 +517,8 @@ async def puntos(interaction: discord.Interaction, juego: app_commands.Choice[st
         color=discord.Color.gold()
     )
 
+    # 3. Enviar la respuesta usando followup
     await interaction.followup.send(embed=embed)
-
 
 @bot.tree.command(name="stats", description="Muestra tus estadísticas según el juego")
 @app_commands.describe(juego="Selecciona el juego a consultar", usuario="Usuario a consultar (opcional)")
