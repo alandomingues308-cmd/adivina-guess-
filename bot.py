@@ -264,7 +264,6 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
         url_phigros = mapa.get("imagen_url") or mapa.get("url_imagen") or mapa.get("imagen")
         urls_imagen = [url_phigros] if url_phigros else []
 
-    for url in urls_imagen:
         for url in urls_imagen:
         if not url:
             continue
