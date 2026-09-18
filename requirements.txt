@@ -4,4 +4,4 @@ python-dotenv
 Pillow
 flask
 firebase-admin
-flask
+Flask
