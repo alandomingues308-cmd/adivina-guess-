@@ -311,8 +311,8 @@ def recortar_imagen(imagen_bytes):
     with Image.open(io.BytesIO(imagen_bytes)).convert("RGB") as img:
         ancho, alto = img.size
 
-        ancho_crop = int(ancho * random.uniform(0.18, 0.22))
-        alto_crop = int(alto * random.uniform(0.18, 0.22))
+        ancho_crop = int(ancho * random.uniform(0.15, 0.18))
+        alto_crop = int(alto * random.uniform(0.25, 0.3))
 
         x_max = max(1, ancho - ancho_crop)
         y_max = max(1, alto - alto_crop)
