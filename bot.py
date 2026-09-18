@@ -271,7 +271,7 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
         if not url:
             continue
         try:
-            async with http_session.get(url, headers=headers_request, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+            async with http_session.get(url, headers=headers_request,allow_redirects=True, timeout=aiohttp.ClientTimeout(total=8)) as resp:
                 if resp.status == 200:
                     imagen_bytes = await resp.read()
                     break
