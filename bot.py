@@ -62,7 +62,7 @@ if firebase_json and HAS_FIREBASE:
     except Exception as e:
         print(f"❌ Error al inicializar Firebase Firestore: {e}")
 else:
-    print("⚠️ No se encontró la variable FIREBASE_CREDENTIALS o la librería. Usando sistema local JSON.")
+    print("⚠️ No se encontró la variable FIREBASE_CREDENTIALS o la librería firebase-admin. Usando sistema local JSON.")
 
 OSU_TOKEN = None
 http_session: aiohttp.ClientSession = None
@@ -80,7 +80,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # 3. MIGRACIÓN AUTOMÁTICA DE ARCHIVOS JSON A FIRESTORE
 # ==========================================
 def migrar_json_a_firestore():
-    """Migra los datos locales existentes a Firestore solo una vez al iniciar."""
+    """Migra los datos locales existentes a Firestore al iniciar."""
     if not db:
         return
 
@@ -529,6 +529,7 @@ async def adivina(interaction: discord.Interaction, juego: app_commands.Choice[s
     ]
 )
 async def puntos(interaction: discord.Interaction, juego: app_commands.Choice[str]):
+    # Defer inmediato para evitar Timeout (Error 10062)
     await interaction.response.defer()
 
     top_list = []
@@ -583,6 +584,7 @@ async def puntos(interaction: discord.Interaction, juego: app_commands.Choice[st
     ]
 )
 async def stats(interaction: discord.Interaction, juego: app_commands.Choice[str], usuario: discord.Member = None):
+    # Defer inmediato para evitar Timeout (Error 10062)
     await interaction.response.defer()
 
     target_user = usuario or interaction.user
