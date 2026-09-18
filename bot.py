@@ -265,6 +265,7 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
         urls_imagen = [url_phigros] if url_phigros else []
 
     for url in urls_imagen:
+        for url in urls_imagen:
         if not url:
             continue
         try:
@@ -272,12 +273,17 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
                 if resp.status == 200:
                     imagen_bytes = await resp.read()
                     break
-        except Exception:
-            continue
+                else:
+                    print(f"⚠️ [Phigros Error] Estado HTTP {resp.status} al cargar '{mapa.get('nombre')}' -> URL: {url}")
+        except Exception as e:
+            print(f"❌ [Phigros Error] Excepción al descargar '{mapa.get('nombre')}': {e} -> URL: {url}")
 
     if not imagen_bytes:
-        await interaction.followup.send("❌ Error al descargar la imagen de la canción.")
+        nombre_cancion = mapa.get("nombre", mapa.get("respuestas", ["Desconocida"])[0])
+        print(f"🚨 [Phigros Fallo Total] La canción '{nombre_cancion}' no pudo cargar su imagen. Revisa su enlace en phigros_songs.json.")
+        await interaction.followup.send(f"❌ Error al descargar la imagen de la canción **{nombre_cancion}**.")
         return
+
 
     buffer_recorte = recortar_imagen(imagen_bytes)
     archivo_discord = discord.File(fp=buffer_recorte, filename="pista.jpg")
