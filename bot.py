@@ -257,25 +257,28 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
     imagen_bytes = None
 
     if modo_juego == "osu":
-        set_id = extraer_beatmapset_id(mapa.get("url", ""))
-        urls_imagen = [f"https://assets.ppy.sh/beatmaps/{set_id}/covers/raw.jpg", f"https://assets.ppy.sh/beatmaps/{set_id}/covers/cover.jpg"] if set_id else []
+            set_id = extraer_beatmapset_id(mapa.get("url", ""))
+            urls_imagen = [f"https://assets.ppy.sh/beatmaps/{set_id}/covers/raw.jpg", f"https://assets.ppy.sh/beatmaps/{set_id}/covers/cover.jpg"] if set_id else []
     else:
         set_id = None
+        # Prioriza 'imagen_url' explícitamente y filtra valores vacíos
         url_phigros = mapa.get("imagen_url") or mapa.get("url_imagen") or mapa.get("imagen")
         urls_imagen = [url_phigros] if url_phigros else []
 
-        for url in urls_imagen:
-            if not url:
-                continue
-            try:
-                async with http_session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
-                    if resp.status == 200:
-                        imagen_bytes = await resp.read()
-                        break
-                    else:
-                        print(f"⚠️ [Phigros Error] Estado HTTP {resp.status} al cargar '{mapa.get('nombre')}' -> URL: {url}")
-            except Exception as e:
-                print(f"❌ [Phigros Error] Excepción al descargar '{mapa.get('nombre')}': {e} -> URL: {url}")
+    headers_request = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+
+    for url in urls_imagen:
+        if not url:
+            continue
+        try:
+            async with http_session.get(url, headers=headers_request, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+                if resp.status == 200:
+                    imagen_bytes = await resp.read()
+                    break
+                else:
+                    print(f"⚠️ [Phigros Error] Estado HTTP {resp.status} al cargar '{mapa.get('nombre')}' -> URL: {url}")
+        except Exception as e:
+            print(f"❌ [Phigros Error] Excepción al descargar '{mapa.get('nombre')}': {e} -> URL: {url}")
 
     if not imagen_bytes:
         nombre_cancion = mapa.get("nombre", mapa.get("respuestas", ["Desconocida"])[0])
