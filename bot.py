@@ -505,8 +505,7 @@ async def on_ready():
     print(f"🤖 Bot iniciado como: {bot.user.name}", flush=True)
     await obtener_token_osu()
 
-    # Ejecutar migración de datos locales a Firestore
-    migrar_json_a_firestore()
+    
 
     try:
         synced = await bot.tree.sync()
