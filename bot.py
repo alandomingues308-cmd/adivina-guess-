@@ -1,4 +1,31 @@
 import os
+from threading import Thread
+from flask import Flask
+
+# ==========================================
+# 1. SERVIDOR FLASK (Inicia INMEDIATAMENTE para Render)
+# ==========================================
+app = Flask("")
+
+@app.route("/")
+def home():
+    return "Bot activo 24/7"
+
+def run_flask():
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port, use_reloader=False)
+
+def keep_alive():
+    t = Thread(target=run_flask)
+    t.daemon = True
+    t.start()
+
+# Iniciar respuesta HTTP inmediatamente
+keep_alive()
+
+# ==========================================
+# 2. IMPORTS PESADOS E INICIALIZACIÓN
+# ==========================================
 import json
 import random
 import re
@@ -10,8 +37,6 @@ from discord import app_commands
 from discord.ext import commands
 from dotenv import load_dotenv
 from PIL import Image
-from threading import Thread
-from flask import Flask
 
 # Módulo opcional de Firebase Firestore
 try:
@@ -20,31 +45,8 @@ try:
     HAS_FIREBASE = True
 except Exception as e:
     HAS_FIREBASE = False
-    print(f"⚠️️ No se pudo importar firebase_admin: {e}", flush=True)
+    print(f"⚠️ No se pudo importar firebase_admin: {e}", flush=True)
 
-# ==========================================
-# 1. SERVIDOR FLASK (Evita puerto timeout en Render)
-# ==========================================
-app = Flask("")
-
-@app.route("/")
-def home():
-    return "Bot activo 24/7"
-
-def run_flask():
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
-
-def keep_alive():
-    t = Thread(target=run_flask)
-    t.daemon = True
-    t.start()
-
-keep_alive()
-
-# ==========================================
-# 2. INICIALIZACIÓN DE VARIABLES Y FIREBASE
-# ==========================================
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 OSU_CLIENT_ID = os.getenv("OSU_CLIENT_ID")
@@ -121,7 +123,7 @@ def obtener_catalogo_plano(juego: str):
                 plano.extend(lista)
         return plano
     except Exception as e:
-        print(f"❌ Error obteniendo catalogo plano ({juego}): {e}", flush=True)
+        print(f"❌ Error obteniendo catálogo plano ({juego}): {e}", flush=True)
         return []
 
 def obtener_id_cancion(mapa: dict, juego: str) -> str:
@@ -534,6 +536,4 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
 async def on_ready():
     global http_session
     if http_session is None or http_session.closed:
-        http_session = aiohttp.ClientSession(headers={"User-Agent": "Mozilla/5.0 DiscordBot/1.0"})
-    
-    print
+        http_session = aiohttp.ClientSession(headers={"U
