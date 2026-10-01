@@ -69,9 +69,10 @@ else:
 OSU_TOKEN = None
 http_session: aiohttp.ClientSession = None
 
+# Diccionario de rachas por usuario: {"osu": {user_id: racha}, "phigros": {user_id: racha}}
 racha_actual = {
-    "osu": {"user_id": None, "streak": 0},
-    "phigros": {"user_id": None, "streak": 0}
+    "osu": {},
+    "phigros": {}
 }
 
 intents = discord.Intents.default()
@@ -133,21 +134,42 @@ def obtener_id_cancion(mapa: dict, juego: str) -> str:
     nombre = mapa.get("nombre") or (mapa.get("respuestas", ["sin_nombre"])[0])
     return re.sub(r'[^a-zA-Z0-9_]', '', str(nombre).lower().replace(" ", "_"))
 
-def registrar_cancion_adivinada(juego: str, mapa: dict, user_name: str):
+def registrar_cancion_adivinada(juego: str, mapa: dict, user_id: int, user_name: str):
     song_id = obtener_id_cancion(mapa, juego)
     nombre = mapa.get("nombre") or mapa.get("respuestas", ["Desconocida"])[0].title()
+    uid_str = str(user_id)
 
     if db:
         try:
-            doc_ref = db.collection(f"coleccion_{juego}").document(song_id)
+            doc_ref = db.collection(f"colecciones_{juego}").document(uid_str).collection("canciones").document(song_id)
             doc_ref.set({
                 "nombre": nombre,
                 "adivinada": True,
-                "ultimo_ganador": user_name,
                 "ultima_fecha": firestore.SERVER_TIMESTAMP
             }, merge=True)
         except Exception as e:
             print(f"❌ Error al registrar colección en Firestore: {e}", flush=True)
+        return
+
+    archivo = f"coleccion_{juego}.json"
+    data = {}
+    if os.path.exists(archivo):
+        try:
+            with open(archivo, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            data = {}
+
+    if uid_str not in data:
+        data[uid_str] = {}
+
+    data[uid_str][song_id] = True
+
+    try:
+        with open(archivo, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
+    except Exception as e:
+        print(f"❌ Error al guardar colección local: {e}", flush=True)
 
 def sumar_puntos(juego: str, user_id: int, user_name: str, puntos: int) -> int:
     uid_str = str(user_id)
@@ -250,18 +272,13 @@ def registrar_victoria_stats(juego: str, user_id: int, dificultad_str: str, rach
 
 def registrar_racha(juego: str, user_id: int) -> int:
     global racha_actual
-    state = racha_actual[juego]
-    if state["user_id"] == user_id:
-        state["streak"] += 1
-    else:
-        state["user_id"] = user_id
-        state["streak"] = 1
-    return state["streak"]
+    racha_actual[juego][user_id] = racha_actual[juego].get(user_id, 0) + 1
+    return racha_actual[juego][user_id]
 
-def reiniciar_racha(juego: str):
+def reiniciar_racha(juego: str, user_id: int = None):
     global racha_actual
-    racha_actual[juego]["user_id"] = None
-    racha_actual[juego]["streak"] = 0
+    if user_id:
+        racha_actual[juego][user_id] = 0
 
 def extraer_beatmapset_id(url: str) -> str:
     match = re.search(r"beatmapsets/(\d+)", url)
@@ -333,21 +350,22 @@ def recortar_imagen(imagen_bytes, juego: str = "osu"):
 
     buffer.seek(0)
     return buffer
-# ==========================================
+    # ==========================================
 # 4. COMPONENTES UI Y LÓGICA DEL JUEGO
 # ==========================================
 class BotonFaltantesView(discord.ui.View):
-    def __init__(self, juego: str, faltantes: list):
+    def __init__(self, juego: str, faltantes: list, usuario_nombre: str):
         super().__init__(timeout=120)
         self.juego = juego
         self.faltantes = faltantes
+        self.usuario_nombre = usuario_nombre
 
-    @discord.ui.button(label="❌ Ver Canciones Faltantes", style=discord.ButtonStyle.secondary, emoji="📜")
+    @discord.ui.button(label="📜 Ver canciones faltantes", style=discord.ButtonStyle.secondary, emoji="❌")
     async def ver_faltantes(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
 
         if not self.faltantes:
-            await interaction.followup.send("🎉 ¡Increíble! Ya han adivinado todas las canciones registradas.", ephemeral=True)
+            await interaction.followup.send(f"🎉 ¡Increíble! **{self.usuario_nombre}** ya ha adivinado todas las canciones del catálogo.", ephemeral=True)
             return
 
         lineas = []
@@ -358,14 +376,14 @@ class BotonFaltantesView(discord.ui.View):
 
         texto_completo = "\n".join(lineas)
         if len(texto_completo) > 3900:
-            texto_completo = texto_completo[:3900] + "\n\n*(Lista recortada por límite de espacio)*"
+            texto_completo = texto_completo[:3900] + "\n\n*(Lista recortada por límite de caracteres)*"
 
         embed = discord.Embed(
-            title=f"📋 Canciones pendientes por adivinar — {self.juego.upper()}",
+            title=f"📋 Canciones pendientes de {self.usuario_nombre} — {self.juego.upper()}",
             description=texto_completo,
             color=discord.Color.orange()
         )
-        embed.set_footer(text=f"Total no adivinadas: {len(self.faltantes)}")
+        embed.set_footer(text=f"Total faltantes: {len(self.faltantes)}")
 
         await interaction.followup.send(embed=embed, ephemeral=True)
 
@@ -488,7 +506,7 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
         racha = registrar_racha(modo_juego, msg_ganador.author.id)
         registrar_victoria_stats(modo_juego, msg_ganador.author.id, diff_str, racha)
 
-        registrar_cancion_adivinada(modo_juego, mapa, msg_ganador.author.display_name)
+        registrar_cancion_adivinada(modo_juego, mapa, msg_ganador.author.id, msg_ganador.author.display_name)
 
         tag_racha = f" 🔥 **(Racha: {racha})**" if racha >= 2 else ""
 
@@ -507,8 +525,6 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
         await interaction.channel.send(embed=embed_victoria, file=archivo_completo, view=PlayAgainView(modo_juego))
 
     except asyncio.TimeoutError:
-        reiniciar_racha(modo_juego)
-
         embed_derrota = discord.Embed(
             title="⏰ ¡Tiempo agotado!",
             description=(
@@ -641,16 +657,19 @@ async def stats(interaction: discord.Interaction, juego: app_commands.Choice[str
 
     await interaction.followup.send(embed=embed)
 
-@bot.tree.command(name="coleccion", description="Muestra el total de canciones únicas adivinadas y las pendientes")
-@app_commands.describe(juego="Selecciona el juego a consultar")
+@bot.tree.command(name="coleccion", description="Muestra la colección personal de canciones adivinadas de un usuario")
+@app_commands.describe(juego="Selecciona el juego", usuario="Usuario a consultar (opcional)")
 @app_commands.choices(
     juego=[
         app_commands.Choice(name="osu!", value="osu"),
         app_commands.Choice(name="Phigros", value="phigros")
     ]
 )
-async def coleccion(interaction: discord.Interaction, juego: app_commands.Choice[str]):
+async def coleccion(interaction: discord.Interaction, juego: app_commands.Choice[str], usuario: discord.Member = None):
     await interaction.response.defer()
+
+    target_user = usuario or interaction.user
+    uid_str = str(target_user.id)
 
     catalogo = obtener_catalogo_plano(juego.value)
     total_catalogo = len(catalogo)
@@ -659,12 +678,21 @@ async def coleccion(interaction: discord.Interaction, juego: app_commands.Choice
 
     if db:
         try:
-            docs = db.collection(f"coleccion_{juego.value}").stream()
+            docs = db.collection(f"colecciones_{juego.value}").document(uid_str).collection("canciones").stream()
             for doc in docs:
                 if doc.to_dict().get("adivinada"):
                     adivinadas_ids.add(doc.id)
         except Exception as e:
-            print(f"❌ Error al consultar colección en Firestore: {e}", flush=True)
+            print(f"❌ Error al consultar colección individual en Firestore: {e}", flush=True)
+    else:
+        archivo = f"coleccion_{juego.value}.json"
+        if os.path.exists(archivo):
+            try:
+                with open(archivo, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    adivinadas_ids = set(data.get(uid_str, {}).keys())
+            except Exception:
+                pass
 
     faltantes = []
     adivinadas_conteo = 0
@@ -679,17 +707,18 @@ async def coleccion(interaction: discord.Interaction, juego: app_commands.Choice
     porcentaje = (adivinadas_conteo / total_catalogo * 100) if total_catalogo > 0 else 0
 
     embed = discord.Embed(
-        title=f"📦 Colección Global de Canciones — {juego.name}",
+        title=f"📦 Colección Personal de {target_user.display_name} — {juego.name}",
         description=(
-            f"**Progreso de Adivinanza:** `{adivinadas_conteo} / {total_catalogo}` canciones\n"
+            f"**Progreso:** `{adivinadas_conteo} / {total_catalogo}` canciones descubiertas\n"
             f"**Completado:** `{porcentaje:.1f}%`"
         ),
         color=discord.Color.teal()
     )
-    embed.add_field(name="✅ Adivinadas únicas", value=f"`{adivinadas_conteo}`", inline=True)
-    embed.add_field(name="❌ Pendientes por adivinar", value=f"`{len(faltantes)}`", inline=True)
+    embed.set_thumbnail(url=target_user.display_avatar.url)
+    embed.add_field(name="✅ Canciones en su colección", value=f"`{adivinadas_conteo}`", inline=True)
+    embed.add_field(name="❌ Le faltan por adivinar", value=f"`{len(faltantes)}`", inline=True)
 
-    view = BotonFaltantesView(juego.value, faltantes)
+    view = BotonFaltantesView(juego.value, faltantes, target_user.display_name)
 
     await interaction.followup.send(embed=embed, view=view)
 
