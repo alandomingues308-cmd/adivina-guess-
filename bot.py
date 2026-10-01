@@ -333,7 +333,6 @@ def recortar_imagen(imagen_bytes, juego: str = "osu"):
 
     buffer.seek(0)
     return buffer
-
 # ==========================================
 # 4. COMPONENTES UI Y LÓGICA DEL JUEGO
 # ==========================================
@@ -740,3 +739,4 @@ if __name__ == "__main__":
         import time
         while True:
             time.sleep(3600)
+        
