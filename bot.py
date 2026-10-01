@@ -1,26 +1,35 @@
 import os
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from threading import Thread
-from flask import Flask
 
 # ==========================================
-# 1. SERVIDOR FLASK (Inicia INMEDIATAMENTE para Render)
+# 1. SERVIDOR HTTP LIGERO (Salud para Render)
 # ==========================================
-app = Flask("")
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/html")
+        self.end_headers()
+        self.wfile.write(b"Bot activo 24/7")
 
-@app.route("/")
-def home():
-    return "Bot activo 24/7"
+    def do_HEAD(self):
+        self.send_response(200)
+        self.end_headers()
 
-def run_flask():
+    # Silenciar logs HTTP molestos en la consola de Render
+    def log_message(self, format, *args):
+        return
+
+def run_http_server():
     port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port, use_reloader=False)
+    server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
+    server.serve_forever()
 
 def keep_alive():
-    t = Thread(target=run_flask)
-    t.daemon = True
+    t = Thread(target=run_http_server, daemon=True)
     t.start()
 
-# Iniciar respuesta HTTP inmediatamente
+# Iniciar servidor inmediatamente para Render
 keep_alive()
 
 # ==========================================
@@ -38,7 +47,6 @@ from discord.ext import commands
 from dotenv import load_dotenv
 from PIL import Image
 
-# Módulo opcional de Firebase Firestore
 try:
     import firebase_admin
     from firebase_admin import credentials, firestore
