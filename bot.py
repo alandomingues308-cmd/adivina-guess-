@@ -534,6 +534,18 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
 # ==========================================
 @bot.event
 async def on_ready():
-    global http_session
-    if http_session is None or http_session.closed:
-        http_session = aiohttp.ClientSession(headers={"U
+  global http_session
+  if http_session is None or http_session.closed:
+    http_session = aiohttp.ClientSession(
+        headers={"User-Agent": "Mozilla/5.0 DiscordBot/1.0"}
+    )
+
+  print(f"🤖 Bot iniciado como: {bot.user.name}", flush=True)
+  await obtener_token_osu()
+
+  try:
+    synced = await bot.tree.sync()
+    print(f"✅ Sincronizados {len(synced)} comandos.", flush=True)
+  except Exception as e:
+    print(f"❌ Error al sincronizar: {e}", flush=True)
+
