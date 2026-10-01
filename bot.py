@@ -279,6 +279,8 @@ def reiniciar_racha(juego: str, user_id: int = None):
     global racha_actual
     if user_id:
         racha_actual[juego][user_id] = 0
+    else:
+        racha_actual[juego] = {}
 
 def extraer_beatmapset_id(url: str) -> str:
     match = re.search(r"beatmapsets/(\d+)", url)
@@ -525,6 +527,7 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
         await interaction.channel.send(embed=embed_victoria, file=archivo_completo, view=PlayAgainView(modo_juego))
 
     except asyncio.TimeoutError:
+        reiniciar_racha(modo_juego)
         embed_derrota = discord.Embed(
             title="⏰ ¡Tiempo agotado!",
             description=(
