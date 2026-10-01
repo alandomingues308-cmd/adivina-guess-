@@ -8,25 +8,20 @@ from flask import Flask
 # ==========================================
 app = Flask("")
 
-
 @app.route("/")
 def home():
-  return "Bot activo 24/7"
-
+    return "Bot activo 24/7"
 
 def run_flask():
-  port = int(os.environ.get("PORT", 8080))
-  app.run(host="0.0.0.0", port=port, use_reloader=False)
-
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port, use_reloader=False)
 
 def keep_alive():
-  t = Thread(target=run_flask)
-  t.daemon = True
-  t.start()
-
+    t = Thread(target=run_flask)
+    t.daemon = True
+    t.start()
 
 keep_alive()
-
 
 # ==========================================
 # 2. IMPORTS PESADOS E INICIALIZACIÓN
@@ -118,7 +113,6 @@ def cargar_canciones(juego: str):
         return {"facil": [], "normal": [], "dificil": []}
 
 def obtener_catalogo_plano(juego: str):
-    """Obtiene la lista completa de canciones de forma segura."""
     try:
         db_canciones = cargar_canciones(juego)
         plano = []
@@ -131,7 +125,6 @@ def obtener_catalogo_plano(juego: str):
         return []
 
 def obtener_id_cancion(mapa: dict, juego: str) -> str:
-    """Genera un ID único para registrar en la colección."""
     if juego == "osu":
         set_id = extraer_beatmapset_id(mapa.get("url", ""))
         if set_id:
@@ -342,7 +335,7 @@ def recortar_imagen(imagen_bytes, juego: str = "osu"):
     return buffer
 
 # ==========================================
-# 4. COMPONENTES UI
+# 4. COMPONENTES UI Y LÓGICA DEL JUEGO
 # ==========================================
 class BotonFaltantesView(discord.ui.View):
     def __init__(self, juego: str, faltantes: list):
@@ -406,9 +399,6 @@ class PlayAgainView(discord.ui.View):
         super().__init__(timeout=60)
         self.add_item(DificultadSelect(juego))
 
-# ==========================================
-# 5. LÓGICA DEL JUEGO
-# ==========================================
 async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, dificultad: app_commands.Choice[str] = None):
     global http_session
     try:
@@ -499,7 +489,6 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
         racha = registrar_racha(modo_juego, msg_ganador.author.id)
         registrar_victoria_stats(modo_juego, msg_ganador.author.id, diff_str, racha)
 
-        # Registrar en colección
         registrar_cancion_adivinada(modo_juego, mapa, msg_ganador.author.display_name)
 
         tag_racha = f" 🔥 **(Racha: {racha})**" if racha >= 2 else ""
@@ -534,50 +523,220 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
         await interaction.channel.send(embed=embed_derrota, file=archivo_completo, view=PlayAgainView(modo_juego))
 
 # ==========================================
-# 6. EVENTOS Y COMANDOS SLASH
+# 5. COMANDOS SLASH (@bot.tree.command)
+# ==========================================
+@bot.tree.command(name="adivina", description="Inicia un juego de adivinanza")
+@app_commands.describe(juego="Elige el modo de juego", dificultad="Selecciona la dificultad (opcional)")
+@app_commands.choices(
+    juego=[
+        app_commands.Choice(name="osu!", value="osu"),
+        app_commands.Choice(name="Phigros", value="phigros")
+    ],
+    dificultad=[
+        app_commands.Choice(name="🟢 Fácil (1 pt)", value="facil"),
+        app_commands.Choice(name="🟡 Normal (3 pts)", value="normal"),
+        app_commands.Choice(name="🔴 Difícil (5 pts)", value="dificil")
+    ]
+)
+async def adivina(interaction: discord.Interaction, juego: app_commands.Choice[str], dificultad: app_commands.Choice[str] = None):
+    await ejecutar_juego(interaction, juego.value, dificultad)
+
+@bot.tree.command(name="puntos", description="Muestra la clasificación por juego")
+@app_commands.describe(juego="Selecciona el juego")
+@app_commands.choices(
+    juego=[
+        app_commands.Choice(name="osu!", value="osu"),
+        app_commands.Choice(name="Phigros", value="phigros")
+    ]
+)
+async def puntos(interaction: discord.Interaction, juego: app_commands.Choice[str]):
+    await interaction.response.defer()
+
+    top_list = []
+
+    if db:
+        try:
+            docs = db.collection(f"puntos_{juego.value}").order_by("puntos", direction=firestore.Query.DESCENDING).limit(10).stream()
+            for doc in docs:
+                data = doc.to_dict()
+                top_list.append((doc.id, data))
+        except Exception as e:
+            print(f"❌ Error al leer puntos desde Firestore: {e}", flush=True)
+
+    if not top_list and not db:
+        archivo = "puntos_phigros.json" if juego.value == "phigros" else "puntos.json"
+        pts_data = {}
+        if os.path.exists(archivo):
+            try:
+                with open(archivo, "r", encoding="utf-8") as f:
+                    pts_data = json.load(f)
+            except Exception:
+                pts_data = {}
+                
+        top_list = sorted(
+            pts_data.items(), 
+            key=lambda x: x[1]["puntos"] if isinstance(x[1], dict) else x[1], 
+            reverse=True
+        )[:10]
+
+    lineas = []
+    for i, (uid, data) in enumerate(top_list):
+        nombre = data.get("nombre", f"<@{uid}>") if isinstance(data, dict) else f"<@{uid}>"
+        pts = data.get("puntos", data) if isinstance(data, dict) else data
+        lineas.append(f"`#{i+1}` **{nombre}** — `{pts} pts`")
+
+    txt_ranking = "\n".join(lineas) or "Sin registros aún."
+
+    embed = discord.Embed(
+        title=f"🏆 Tabla de Clasificación ({juego.name})",
+        description=txt_ranking,
+        color=discord.Color.gold()
+    )
+
+    await interaction.followup.send(embed=embed)
+
+@bot.tree.command(name="stats", description="Muestra tus estadísticas según el juego")
+@app_commands.describe(juego="Selecciona el juego a consultar", usuario="Usuario a consultar (opcional)")
+@app_commands.choices(
+    juego=[
+        app_commands.Choice(name="osu!", value="osu"),
+        app_commands.Choice(name="Phigros", value="phigros")
+    ]
+)
+async def stats(interaction: discord.Interaction, juego: app_commands.Choice[str], usuario: discord.Member = None):
+    await interaction.response.defer()
+
+    target_user = usuario or interaction.user
+    uid_str = str(target_user.id)
+    user_data = {"facil": 0, "normal": 0, "dificil": 0, "max_racha": 0}
+
+    if db:
+        try:
+            doc = db.collection(f"stats_{juego.value}").document(uid_str).get()
+            if doc.exists:
+                user_data.update(doc.to_dict())
+        except Exception as e:
+            print(f"❌ Error al consultar stats en Firestore: {e}", flush=True)
+    else:
+        archivo = "stats_phigros.json" if juego.value == "phigros" else "stats.json"
+        if os.path.exists(archivo):
+            try:
+                with open(archivo, "r", encoding="utf-8") as f:
+                    stats_db = json.load(f)
+                    user_data.update(stats_db.get(uid_str, {}))
+            except Exception:
+                pass
+
+    total = user_data.get("facil", 0) + user_data.get("normal", 0) + user_data.get("dificil", 0)
+
+    embed = discord.Embed(
+        title=f"📊 Estadísticas de {target_user.display_name} ({juego.name})",
+        color=discord.Color.blue()
+    )
+    embed.set_thumbnail(url=target_user.display_avatar.url)
+    embed.add_field(name="🟢 Fáciles", value=f"`{user_data.get('facil', 0)}`", inline=True)
+    embed.add_field(name="🟡 Normales", value=f"`{user_data.get('normal', 0)}`", inline=True)
+    embed.add_field(name="🔴 Difíciles", value=f"`{user_data.get('dificil', 0)}`", inline=True)
+    embed.add_field(name="🔥 Racha Máxima", value=f"`{user_data.get('max_racha', 0)}` seguidas", inline=True)
+    embed.add_field(name="🎮 Total Adivinadas", value=f"`{total}`", inline=True)
+
+    await interaction.followup.send(embed=embed)
+
+@bot.tree.command(name="coleccion", description="Muestra el total de canciones únicas adivinadas y las pendientes")
+@app_commands.describe(juego="Selecciona el juego a consultar")
+@app_commands.choices(
+    juego=[
+        app_commands.Choice(name="osu!", value="osu"),
+        app_commands.Choice(name="Phigros", value="phigros")
+    ]
+)
+async def coleccion(interaction: discord.Interaction, juego: app_commands.Choice[str]):
+    await interaction.response.defer()
+
+    catalogo = obtener_catalogo_plano(juego.value)
+    total_catalogo = len(catalogo)
+
+    adivinadas_ids = set()
+
+    if db:
+        try:
+            docs = db.collection(f"coleccion_{juego.value}").stream()
+            for doc in docs:
+                if doc.to_dict().get("adivinada"):
+                    adivinadas_ids.add(doc.id)
+        except Exception as e:
+            print(f"❌ Error al consultar colección en Firestore: {e}", flush=True)
+
+    faltantes = []
+    adivinadas_conteo = 0
+
+    for mapa in catalogo:
+        song_id = obtener_id_cancion(mapa, juego.value)
+        if song_id in adivinadas_ids:
+            adivinadas_conteo += 1
+        else:
+            faltantes.append(mapa)
+
+    porcentaje = (adivinadas_conteo / total_catalogo * 100) if total_catalogo > 0 else 0
+
+    embed = discord.Embed(
+        title=f"📦 Colección Global de Canciones — {juego.name}",
+        description=(
+            f"**Progreso de Adivinanza:** `{adivinadas_conteo} / {total_catalogo}` canciones\n"
+            f"**Completado:** `{porcentaje:.1f}%`"
+        ),
+        color=discord.Color.teal()
+    )
+    embed.add_field(name="✅ Adivinadas únicas", value=f"`{adivinadas_conteo}`", inline=True)
+    embed.add_field(name="❌ Pendientes por adivinar", value=f"`{len(faltantes)}`", inline=True)
+
+    view = BotonFaltantesView(juego.value, faltantes)
+
+    await interaction.followup.send(embed=embed, view=view)
+
+# ==========================================
+# 6. EVENTOS DISCORD (on_ready Y on_close)
 # ==========================================
 @bot.event
 async def on_ready():
-  global http_session
-  if http_session is None or http_session.closed:
-    http_session = aiohttp.ClientSession(
-        headers={"User-Agent": "Mozilla/5.0 DiscordBot/1.0"}
-    )
+    global http_session
+    if http_session is None or http_session.closed:
+        http_session = aiohttp.ClientSession(
+            headers={"User-Agent": "Mozilla/5.0 DiscordBot/1.0"}
+        )
 
-  print(f"🤖 Bot iniciado como: {bot.user.name}", flush=True)
-  await obtener_token_osu()
+    print(f"🤖 Bot iniciado como: {bot.user.name}", flush=True)
+    await obtener_token_osu()
 
-  try:
-    synced = await bot.tree.sync()
-    print(f"✅ Sincronizados {len(synced)} comandos.", flush=True)
-  except Exception as e:
-    print(f"❌ Error al sincronizar: {e}", flush=True)
+    try:
+        synced = await bot.tree.sync()
+        print(f"✅ Sincronizados {len(synced)} comandos.", flush=True)
+    except Exception as e:
+        print(f"❌ Error al sincronizar: {e}", flush=True)
+
+@bot.event
+async def on_close():
+    global http_session
+    if http_session and not http_session.closed:
+        await http_session.close()
 
 # ==========================================
 # 7. INICIAR BOT
 # ==========================================
 if __name__ == "__main__":
-  print("🔑 Verificando Token de Discord...", flush=True)
+    print("🔑 Verificando Token de Discord...", flush=True)
 
-  if not DISCORD_TOKEN:
-    print(
-        "❌ ERROR CRÍTICO: La variable 'DISCORD_TOKEN' no existe o está vacía"
-        " en Render.",
-        flush=True,
-    )
-    import time
+    if not DISCORD_TOKEN:
+        print("❌ ERROR CRÍTICO: La variable 'DISCORD_TOKEN' no existe o está vacía en Render.", flush=True)
+        import time
+        while True:
+            time.sleep(3600)
 
-    while True:
-      time.sleep(3600)
-
-  try:
-    print("🚀 Iniciando cliente de discord.py...", flush=True)
-    bot.run(DISCORD_TOKEN)
-  except Exception as e:
-    print(f"❌ Error al ejecutar bot.run(): {e}", flush=True)
-    import time
-
-    while True:
-      time.sleep(3600)
-      
-
+    try:
+        print("🚀 Iniciando cliente de discord.py...", flush=True)
+        bot.run(DISCORD_TOKEN)
+    except Exception as e:
+        print(f"❌ Error al ejecutar bot.run(): {e}", flush=True)
+        import time
+        while True:
+            time.sleep(3600)
