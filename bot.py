@@ -18,11 +18,12 @@ try:
     import firebase_admin
     from firebase_admin import credentials, firestore
     HAS_FIREBASE = True
-except ImportError:
+except Exception as e:
     HAS_FIREBASE = False
+    print(f"⚠️️ No se pudo importar firebase_admin: {e}", flush=True)
 
 # ==========================================
-# 1. SERVIDOR FLASK (Evita errores de puerto en Render)
+# 1. SERVIDOR FLASK (Evita puerto timeout en Render)
 # ==========================================
 app = Flask("")
 
@@ -62,7 +63,7 @@ if firebase_json and HAS_FIREBASE:
     except Exception as e:
         print(f"❌ Error al inicializar Firebase Firestore: {e}", flush=True)
 else:
-    print("⚠️ No se encontró la variable FIREBASE_CREDENTIALS o la librería firebase-admin. Usando sistema local JSON.", flush=True)
+    print("⚠️ No se encontró la variable FIREBASE_CREDENTIALS o la librería. Usando modo JSON.", flush=True)
 
 OSU_TOKEN = None
 http_session: aiohttp.ClientSession = None
@@ -82,6 +83,10 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 def cargar_canciones(juego: str):
     archivo = "phigros_songs.json" if juego == "phigros" else "beatmaps.json"
     try:
+        if not os.path.exists(archivo):
+            print(f"⚠️ Archivo no encontrado: {archivo}", flush=True)
+            return {"facil": [], "normal": [], "dificil": []}
+
         with open(archivo, "r", encoding="utf-8") as f:
             datos = json.load(f)
             
@@ -107,25 +112,29 @@ def cargar_canciones(juego: str):
         return {"facil": [], "normal": [], "dificil": []}
 
 def obtener_catalogo_plano(juego: str):
-    """Obtiene la lista completa de objetos de canción sin importar la dificultad."""
-    db_canciones = cargar_canciones(juego)
-    plano = []
-    for dif, lista in db_canciones.items():
-        plano.extend(lista)
-    return plano
+    """Obtiene la lista completa de canciones de forma segura."""
+    try:
+        db_canciones = cargar_canciones(juego)
+        plano = []
+        for dif, lista in db_canciones.items():
+            if isinstance(lista, list):
+                plano.extend(lista)
+        return plano
+    except Exception as e:
+        print(f"❌ Error obteniendo catalogo plano ({juego}): {e}", flush=True)
+        return []
 
 def obtener_id_cancion(mapa: dict, juego: str) -> str:
-    """Genera una clave única limpia para cada canción."""
+    """Genera un ID único para registrar en la colección."""
     if juego == "osu":
         set_id = extraer_beatmapset_id(mapa.get("url", ""))
         if set_id:
             return set_id
     
     nombre = mapa.get("nombre") or (mapa.get("respuestas", ["sin_nombre"])[0])
-    return re.sub(r'[^a-zA-Z0-9_]', '', nombre.lower().replace(" ", "_"))
+    return re.sub(r'[^a-zA-Z0-9_]', '', str(nombre).lower().replace(" ", "_"))
 
 def registrar_cancion_adivinada(juego: str, mapa: dict, user_name: str):
-    """Registra en Firestore que una canción ya fue adivinada por lo menos una vez."""
     song_id = obtener_id_cancion(mapa, juego)
     nombre = mapa.get("nombre") or mapa.get("respuestas", ["Desconocida"])[0].title()
 
@@ -138,7 +147,6 @@ def registrar_cancion_adivinada(juego: str, mapa: dict, user_name: str):
                 "ultimo_ganador": user_name,
                 "ultima_fecha": firestore.SERVER_TIMESTAMP
             }, merge=True)
-            print(f"🎵 Canción registrada en la colección ({juego}): {nombre}", flush=True)
         except Exception as e:
             print(f"❌ Error al registrar colección en Firestore: {e}", flush=True)
 
@@ -160,12 +168,10 @@ def sumar_puntos(juego: str, user_id: int, user_name: str, puntos: int) -> int:
                 "nombre": user_name,
                 "puntos": nuevo_total
             }, merge=True)
-            print(f"✅ Puntos guardados en Firestore para {user_name}: {nuevo_total} pts", flush=True)
             return nuevo_total
         except Exception as e:
             print(f"❌ Error al actualizar puntos en Firestore: {e}", flush=True)
 
-    # Fallback JSON local
     archivo = "puntos_phigros.json" if juego == "phigros" else "puntos.json"
     puntos_db = {}
     if os.path.exists(archivo):
@@ -221,7 +227,6 @@ def registrar_victoria_stats(juego: str, user_id: int, dificultad_str: str, rach
         except Exception as e:
             print(f"❌ Error al guardar stats en Firestore: {e}", flush=True)
 
-    # Fallback JSON local
     archivo = "stats_phigros.json" if juego == "phigros" else "stats.json"
     stats_db = {}
     if os.path.exists(archivo):
@@ -331,7 +336,7 @@ def recortar_imagen(imagen_bytes, juego: str = "osu"):
     return buffer
 
 # ==========================================
-# 4.5 COMPONENTES UI PARA EL COMANDO COLECCIÓN
+# 4. COMPONENTES UI
 # ==========================================
 class BotonFaltantesView(discord.ui.View):
     def __init__(self, juego: str, faltantes: list):
@@ -353,10 +358,9 @@ class BotonFaltantesView(discord.ui.View):
             dif = item.get("dificultad", "normal").capitalize()
             lineas.append(f"• **{nombre}** (`{dif}`)")
 
-        # Dividir si hay muchas canciones para no superar el límite de caracteres de Discord
         texto_completo = "\n".join(lineas)
         if len(texto_completo) > 3900:
-            texto_completo = texto_completo[:3900] + "\n\n*(Lista recortada por espacio)*"
+            texto_completo = texto_completo[:3900] + "\n\n*(Lista recortada por límite de espacio)*"
 
         embed = discord.Embed(
             title=f"📋 Canciones pendientes por adivinar — {self.juego.upper()}",
@@ -367,9 +371,6 @@ class BotonFaltantesView(discord.ui.View):
 
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-# ==========================================
-# 5. COMPONENTES UI Y JUEGO
-# ==========================================
 class DificultadSelect(discord.ui.Select):
     def __init__(self, juego: str):
         self.juego = juego
@@ -399,6 +400,9 @@ class PlayAgainView(discord.ui.View):
         super().__init__(timeout=60)
         self.add_item(DificultadSelect(juego))
 
+# ==========================================
+# 5. LÓGICA DEL JUEGO
+# ==========================================
 async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, dificultad: app_commands.Choice[str] = None):
     global http_session
     try:
@@ -446,7 +450,6 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
         return
 
     buffer_recorte = recortar_imagen(imagen_bytes, juego=modo_juego)
-
     archivo_discord = discord.File(fp=buffer_recorte, filename="pista.jpg")
 
     puntos_mapa = {"facil": 1, "normal": 3, "dificil": 5}.get(diff_str, 3)
@@ -490,7 +493,7 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
         racha = registrar_racha(modo_juego, msg_ganador.author.id)
         registrar_victoria_stats(modo_juego, msg_ganador.author.id, diff_str, racha)
 
-        # Registrar la canción adivinada en la colección
+        # Registrar en colección
         registrar_cancion_adivinada(modo_juego, mapa, msg_ganador.author.display_name)
 
         tag_racha = f" 🔥 **(Racha: {racha})**" if racha >= 2 else ""
@@ -531,4 +534,6 @@ async def ejecutar_juego(interaction: discord.Interaction, modo_juego: str, difi
 async def on_ready():
     global http_session
     if http_session is None or http_session.closed:
-        http_session = aiohttp.ClientSessi
+        http_session = aiohttp.ClientSession(headers={"User-Agent": "Mozilla/5.0 DiscordBot/1.0"})
+    
+    print
