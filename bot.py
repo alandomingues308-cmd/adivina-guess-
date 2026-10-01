@@ -553,3 +553,31 @@ async def on_ready():
   except Exception as e:
     print(f"❌ Error al sincronizar: {e}", flush=True)
 
+# ==========================================
+# 7. INICIAR BOT
+# ==========================================
+if __name__ == "__main__":
+  print("🔑 Verificando Token de Discord...", flush=True)
+
+  if not DISCORD_TOKEN:
+    print(
+        "❌ ERROR CRÍTICO: La variable 'DISCORD_TOKEN' no existe o está vacía"
+        " en Render.",
+        flush=True,
+    )
+    import time
+
+    while True:
+      time.sleep(3600)
+
+  try:
+    print("🚀 Iniciando cliente de discord.py...", flush=True)
+    bot.run(DISCORD_TOKEN)
+  except Exception as e:
+    print(f"❌ Error al ejecutar bot.run(): {e}", flush=True)
+    import time
+
+    while True:
+      time.sleep(3600)
+      
+
