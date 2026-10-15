@@ -2,6 +2,9 @@ import os
 import sys
 from threading import Thread
 from flask import Flask
+import time
+import asyncio
+time.sleep(10)
 
 # ==========================================
 # 1. SERVIDOR FLASK (Responde a Render)
